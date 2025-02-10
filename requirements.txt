@@ -1,0 +1,9 @@
+langchain
+langchain-openai
+langchain-community
+faiss-cpu
+PyMuPDF
+Pillow
+python-dotenv
+flask-cors
+gunicorn 
