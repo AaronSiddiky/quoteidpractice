@@ -30,6 +30,9 @@ if not api_key:
     api_key = "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"
 os.environ["OPENAI_API_KEY"] = api_key
 
+# Add this near the top of the file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 class EvaluateGuessInput(BaseModel):
     guess: str
     correct_book: str
@@ -298,12 +301,12 @@ class QuoteAgent:
 def home():
     return "Quote Game is running!"
 
-# Add at the top level, after app initialization
+# Modify the book initialization
 agent = QuoteAgent()  # Create a single instance
 book = {
     "title": "The Translator of Desires",
     "author": "Ibn 'Arabi",
-    "filepath": "./books/translator_of_desires.pdf",
+    "filepath": os.path.join(BASE_DIR, "books", "translator_of_desires.pdf"),
     "page_range": (41, 282)
 }
 # Initialize the agent with the book
@@ -313,8 +316,11 @@ agent.add_book(**book)
 @cross_origin()
 def get_quote():
     try:
+        # Check if PDF exists
+        if not os.path.exists(book["filepath"]):
+            return jsonify({"error": f"PDF file not found at {book['filepath']}"}), 500
+            
         result = agent.get_random_quote()
-        # Generate and add the page image
         image_path = agent.show_page_image(
             result["correct_book"]["filepath"], 
             result["page"]
@@ -322,6 +328,7 @@ def get_quote():
         result["image_path"] = image_path
         return jsonify(result)
     except Exception as e:
+        print(f"Error in get_quote: {str(e)}")  # Add logging
         return jsonify({"error": str(e)}), 500
 
 @app.route('/evaluate', methods=['POST'])
