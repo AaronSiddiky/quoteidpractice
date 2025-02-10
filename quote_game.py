@@ -16,7 +16,6 @@ import os
 import fitz  # PyMuPDF for handling PDFs
 from PIL import Image
 import io
-from langchain.tools import StructuredTool
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_cors import cross_origin
@@ -32,6 +31,16 @@ os.environ["OPENAI_API_KEY"] = api_key
 
 # Add this near the top of the file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def check_pdf_exists():
+    pdf_path = os.path.join(BASE_DIR, "books", "translator_of_desires.pdf")
+    exists = os.path.exists(pdf_path)
+    print(f"Checking PDF at path: {pdf_path}")
+    print(f"PDF exists: {exists}")
+    print(f"Current directory contents: {os.listdir(BASE_DIR)}")
+    if os.path.exists(os.path.join(BASE_DIR, "books")):
+        print(f"Books directory contents: {os.listdir(os.path.join(BASE_DIR, 'books'))}")
+    return exists
 
 class EvaluateGuessInput(BaseModel):
     guess: str
@@ -80,14 +89,13 @@ class QuoteAgent:
         tools = [
             Tool(
                 name="select_quote",
-                description="Select a meaningful quote from the passage",
+                description="Select meaningful quotes from book passages",
                 func=select_quote
             ),
-            StructuredTool(
+            Tool(
                 name="evaluate_guess",
                 description="Evaluate if a guess matches the correct book",
-                func=evaluate_guess,
-                args_schema=EvaluateGuessInput
+                func=evaluate_guess
             )
         ]
         return tools
@@ -299,7 +307,8 @@ class QuoteAgent:
 # Add Flask routes
 @app.route('/')
 def home():
-    return "Quote Game is running!"
+    pdf_status = "PDF found" if check_pdf_exists() else "PDF not found"
+    return f"Quote Game is running! {pdf_status}"
 
 # Modify the book initialization
 agent = QuoteAgent()  # Create a single instance
@@ -316,9 +325,11 @@ agent.add_book(**book)
 @cross_origin()
 def get_quote():
     try:
-        # Check if PDF exists
-        if not os.path.exists(book["filepath"]):
-            return jsonify({"error": f"PDF file not found at {book['filepath']}"}), 500
+        if not check_pdf_exists():
+            return jsonify({
+                "error": "PDF file not found", 
+                "details": f"Looking in: {os.path.join(BASE_DIR, 'books', 'translator_of_desires.pdf')}"
+            }), 500
             
         result = agent.get_random_quote()
         image_path = agent.show_page_image(
@@ -328,7 +339,7 @@ def get_quote():
         result["image_path"] = image_path
         return jsonify(result)
     except Exception as e:
-        print(f"Error in get_quote: {str(e)}")  # Add logging
+        print(f"Error in get_quote: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/evaluate', methods=['POST'])
