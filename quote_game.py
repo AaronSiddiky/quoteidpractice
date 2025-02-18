@@ -6,19 +6,19 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
-import torch
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import re
 
 class QuoteGame:
     def __init__(self, books_dir: str = "books"):
         self.books_dir = books_dir
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,  # Increased to accommodate full paragraphs
-            chunk_overlap=0,   # No overlap needed for paragraphs
+            chunk_size=150,  # Approximate size for 2-4 sentences
+            chunk_overlap=20,  # Small overlap to avoid cutting mid-sentence
             length_function=len,
-            separators=["\n\n", "\n", ". "]  # Prioritize paragraph breaks
+            separators=["\n\n", "\n", ". ", "! ", "? "]  # Added sentence-ending punctuation
         )
         self.passages = []
         self.book_titles = []
@@ -63,6 +63,32 @@ class QuoteGame:
         # If no significant quote found after 10 attempts, return the last tried quote
         return quote, book_title
     
+    def process_text_to_sentences(self, text: str) -> List[str]:
+        """Split text into chunks of 2-4 sentences."""
+        # Clean the text
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Split into sentences (considering multiple punctuation marks)
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        # Group sentences into chunks of 2-4
+        chunks = []
+        current_chunk = []
+        
+        for sentence in sentences:
+            current_chunk.append(sentence)
+            
+            # When we have 2-4 sentences, create a chunk
+            if len(current_chunk) >= 2 and (len(current_chunk) == 4 or random.random() < 0.5):
+                chunks.append(' '.join(current_chunk))
+                current_chunk = []
+        
+        # Add any remaining sentences
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+        
+        return chunks
+
     def load_books(self):
         """Load all PDF books from the books directory and create vector store."""
         for filename in os.listdir(self.books_dir):
@@ -75,24 +101,19 @@ class QuoteGame:
                     reader = PyPDF2.PdfReader(file)
                     text = ""
                     for page in reader.pages:
-                        page_text = page.extract_text()
-                        # Clean up extra whitespace while preserving paragraph breaks
-                        page_text = '\n\n'.join(
-                            para.strip() 
-                            for para in page_text.split('\n\n') 
-                            if para.strip()
-                        )
-                        text += page_text + '\n\n'
+                        text += page.extract_text() + " "
                 
-                # Split into paragraphs
-                paragraphs = [
-                    para.strip() 
-                    for para in text.split('\n\n') 
-                    if para.strip() and len(para.strip().split()) > 20  # Only keep paragraphs with >20 words
+                # Process text into 2-4 sentence chunks
+                chunks = self.process_text_to_sentences(text)
+                
+                # Filter out chunks that are too short or too long
+                valid_chunks = [
+                    chunk for chunk in chunks 
+                    if 20 <= len(chunk.split()) <= 100  # Reasonable length for 2-4 sentences
                 ]
                 
-                # Store paragraphs with book titles
-                self.passages.extend([(para, book_title) for para in paragraphs])
+                # Store chunks with book titles
+                self.passages.extend([(chunk, book_title) for chunk in valid_chunks])
                 self.book_titles.append(book_title)
         
         # Create vector store
