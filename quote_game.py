@@ -13,7 +13,7 @@ import re
 class QuoteGame:
     def __init__(self, books_dir: str = "books"):
         self.books_dir = books_dir
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=150,  # Approximate size for 2-4 sentences
             chunk_overlap=20,  # Small overlap to avoid cutting mid-sentence
