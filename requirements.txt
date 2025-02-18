@@ -1,11 +1,8 @@
+PyPDF2==3.0.1
 langchain==0.1.0
-langchain-openai==0.0.2
-langchain-community==0.0.10
+sentence-transformers==2.2.2
 faiss-cpu==1.7.4
-PyMuPDF==1.23.8
-Pillow==10.2.0
-python-dotenv==1.0.0
-flask-cors==4.0.0
-gunicorn==21.2.0
-flask==3.0.0
-pypdf==4.0.1 
+numpy>=1.24.0
+torch>=2.0.0
+Flask==3.0.0
+Flask-CORS==4.0.0 
